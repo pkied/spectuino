@@ -20,6 +20,15 @@ void setup() {
   as7341.setASTEP(999);
   as7341.setGain(AS7341_GAIN_256X);
   as7341.enableLED(false);
+
+  as7341.enableSpectralMeasurement(false);
+  as7341.setLowThreshold(250);
+  as7341.setHighThreshold(10000);
+  as7341.setAPERS(AS7341_INT_COUNT_ALL);
+  as7341.setSpectralThresholdChannel(AS7341_ADC_CHANNEL_4);
+  as7341.enableSpectralInterrupt(true);
+  as7341.enableSpectralMeasurement(true);
+
 }
 
 void loop() {
@@ -27,22 +36,28 @@ void loop() {
   float counts[12];
   as7341.readAllChannels(readings);
 
-  uint8_t row = 0; 
-
   for(uint8_t i = 0; i < 12; i++) {
     if(i == 4 || i == 5) continue;
     counts[i] = as7341.toBasicCounts(readings[i]);
-    drawBar(labels[i],row*21,counts[i],colors[i]);
+  }
+
+  uint8_t row = 0; 
+  for(uint8_t i = 0; i < 11; i++) {
+    if(i == 4 || i == 5) continue;
+    drawBar(labels[i],row*21,counts[i],colors[i],counts[11]);
     row++;
   }
+
+
 
   drawStatus();
 }
 
-void drawBar(char *text, byte y, float val, uint16_t color) {
+void drawBar(char *text, byte y, float val, uint16_t color, float clearLevel) {
   byte textWidth = 40;
   byte barHeight = 20;
   byte barWidth = (byte)(val * 200);
+  byte clrWidth = (byte)(clearLevel * 200);
   tft.setCursor(0, y);
   tft.setTextSize(2);
   tft.setTextColor(ST77XX_WHITE);
@@ -50,6 +65,11 @@ void drawBar(char *text, byte y, float val, uint16_t color) {
   tft.print(text);
   tft.fillRect(textWidth+barWidth, y, 239-barWidth-textWidth, barHeight, ST77XX_BLACK);
   tft.fillRect(textWidth, y, barWidth, barHeight, color);
+  for(uint8_t i= y; i<y+barHeight; i=i+3) {
+    tft.drawPixel(textWidth+clrWidth, i, ST77XX_WHITE);
+  }
+  
+  tft.fillRect(208, y+4, 30, 11, ST77XX_BLACK);
   tft.setCursor(210, y+6);
   tft.setTextSize(1);
   tft.print(val);
@@ -65,4 +85,17 @@ void drawStatus() {
   if (flicker_freq == 0) tft.print("N/F");
   else if (flicker_freq == 1) tft.print("U/F");
   else { tft.print(flicker_freq); tft.print(" Hz"); };
+
+//  uint8_t int_status = as7341.getInterruptStatus();
+ // if (!(int_status & 0x80)) return;
+
+  uint8_t int_source = as7341.spectralInterruptSource();
+  if (int_source & 0x10) {
+    tft.print("LO");
+  }
+  if (int_source & 0x20) {
+    tft.print("HI");
+  }
+
+  as7341.clearInterruptStatus();
 }
